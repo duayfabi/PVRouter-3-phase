@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef _UTILS_TEMP_H
-#define _UTILS_TEMP_H
+#ifndef UTILS_TEMP_H
+#define UTILS_TEMP_H
 
 #include <Arduino.h>
 
@@ -65,7 +65,7 @@ public:
    * @brief Request temperature for all sensors
    *
    */
-  void requestTemperatures()
+  void requestTemperatures() const
   {
 #ifdef TEMP_ENABLED
     oneWire.reset();
@@ -78,7 +78,7 @@ public:
    * @brief Initialize the Dallas sensors
    *
    */
-  void initTemperatureSensors()
+  void initTemperatureSensors() const
   {
 #ifdef TEMP_ENABLED
     oneWire.begin(sensorPin);
@@ -112,7 +112,7 @@ public:
    * @param idx The index of the device
    * @return int16_t Temperature * 100
    */
-  int16_t readTemperature(const uint8_t idx)
+  int16_t readTemperature(const uint8_t idx) const
   {
     static ScratchPad buf;
 
@@ -160,4 +160,4 @@ private:
 #endif
 };
 
-#endif  // _UTILS_TEMP_H
+#endif  // UTILS_TEMP_H

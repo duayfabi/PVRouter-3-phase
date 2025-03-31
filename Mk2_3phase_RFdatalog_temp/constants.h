@@ -9,8 +9,10 @@
  *
  */
 
-#ifndef _CONSTANTS_H
-#define _CONSTANTS_H
+#ifndef CONSTANTS_H
+#define CONSTANTS_H
+
+#include <Arduino.h>
 
 // Dallas DS18B20 commands
 inline constexpr uint8_t CONVERT_TEMPERATURE{ 0x44 };
@@ -24,4 +26,4 @@ inline constexpr int16_t TEMP_RANGE_HIGH{ 12500 };
 inline constexpr int16_t DEVICE_DISCONNECTED_C{ -127 };
 inline constexpr int16_t DEVICE_DISCONNECTED_RAW{ -7040 };
 
-#endif  // _CONSTANTS_H
+#endif  // CONSTANTS_H

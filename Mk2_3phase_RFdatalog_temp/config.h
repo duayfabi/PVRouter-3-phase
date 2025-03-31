@@ -9,19 +9,13 @@
  *
  */
 
-#ifndef _CONFIG_H
-#define _CONFIG_H
+#ifndef CONFIG_H
+#define CONFIG_H
 
 //--------------------------------------------------------------------------------------------------
 //#define TEMP_ENABLED  /**< this line must be commented out if the temperature sensor is not present */
-//#define RF_PRESENT  /**< this line must be commented out if the RFM12B module is not present */
-
-// Output messages
-//#define EMONESP  /**< Uncomment if an ESP WiFi module is used
-
+//#define RF_PRESENT  /**< this line must be commented out if the RFM12B module is not present */#define ENABLE_DEBUG /**< enable this line to include debugging print statements */
 #define ENABLE_DEBUG /**< enable this line to include debugging print statements */
-#define SERIALPRINT  /**< include 'human-friendly' print statement for commissioning - comment this line to exclude. */
-//#define SERIALOUT /**< Uncomment if a wired serial connection is used */
 //--------------------------------------------------------------------------------------------------
 
 #include "config_system.h"
@@ -31,6 +25,9 @@
 #include "utils_dualtariff.h"
 #include "utils_relay.h"
 #include "utils_temp.h"
+
+// constexpr variable to set the serial output type
+inline constexpr SerialOutputType SERIAL_OUTPUT_TYPE = SerialOutputType::HumanReadable;
 
 //--------------------------------------------------------------------------------------------------
 // constants which must be set individually for each system
@@ -50,7 +47,7 @@ inline constexpr bool OVERRIDE_PIN_PRESENT{ false };                    /**< set
 #endif
 
 inline constexpr bool WATCHDOG_PIN_PRESENT{ false }; /**< set it to 'true' if there's a watch led */
-inline constexpr bool RELAY_DIVERSION{ false };       /**< set it to 'true' if a relay is used for diversion */
+inline constexpr bool RELAY_DIVERSION{ false };      /**< set it to 'true' if a relay is used for diversion */
 inline constexpr bool DUAL_TARIFF{ false };          /**< set it to 'true' if there's a dual tariff each day AND the router is connected to the billing meter */
 
 // ----------- Pinout assignments -----------
@@ -95,7 +92,7 @@ inline constexpr TemperatureSensing temperatureSensing{ 0xff,
                                                           { 0x28, 0x59, 0x1F, 0x6A, 0x09, 0x00, 0x00, 0xB0 },
                                                           { 0x28, 0x1B, 0xD7, 0x6A, 0x09, 0x00, 0x00, 0xB7 } } }; /**< list of temperature sensor Addresses */
 
-inline constexpr uint32_t ROTATION_AFTER_CYCLES{ 8UL * 3600UL * SUPPLY_FREQUENCY }; /**< rotates load priorities after this period of inactivity */
+inline constexpr uint32_t ROTATION_AFTER_SECONDS{ 8UL * 3600UL }; /**< rotates load priorities after this period of inactivity */
 
 /* --------------------------------------
    RF configuration (for the RFM12B module)
@@ -114,4 +111,4 @@ inline constexpr int UNO{ 1 };            /**< for when the processor contains t
 
 #endif  // RF_PRESENT
 
-#endif  // _CONFIG_H
+#endif  // CONFIG_H

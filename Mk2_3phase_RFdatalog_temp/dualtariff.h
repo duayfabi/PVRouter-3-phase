@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef _OFFPEAK_H
-#define _OFFPEAK_H
+#ifndef DUALTARIFF_H
+#define DUALTARIFF_H
 
 #include "config.h"
 
@@ -112,4 +112,4 @@ inline void printDualTariffConfiguration()
   }
 }
 
-#endif  // _OFFPEAK_H
+#endif /* DUALTARIFF_H */

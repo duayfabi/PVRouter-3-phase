@@ -12,6 +12,10 @@
 			"path": "Mk2_3phase_RFdatalog_temp"
 		},
 		{
+			"name": "CT Analyzer free-running",
+			"path": "dev/RST_3phase_free_dev"
+		},
+		{
 			"name": "Transformer checker",
 			"path": "dev/Transformer_Checker"
 		},
@@ -22,12 +26,29 @@
 		{
 			"name": "MathPerfTests",
 			"path": "dev/MathPerfTests"
-		}
+		},
 	],
 	"settings": {
 		"files.associations": {
 			"xtr1common": "cpp",
-			"new": "cpp"
+			"new": "cpp",
+			"cstddef": "cpp",
+			"compare": "cpp",
+			"concepts": "cpp",
+			"cstdint": "cpp",
+			"cstdio": "cpp",
+			"cstdlib": "cpp",
+			"cstring": "cpp",
+			"cwchar": "cpp",
+			"exception": "cpp",
+			"initializer_list": "cpp",
+			"limits": "cpp",
+			"tuple": "cpp",
+			"type_traits": "cpp",
+			"utility": "cpp",
+			"vector": "cpp",
+			"xmemory": "cpp",
+			"xutility": "cpp"
 		}
 	}
 }

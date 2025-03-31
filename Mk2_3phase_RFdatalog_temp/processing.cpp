@@ -25,8 +25,6 @@ constexpr int16_t i_DCoffset_I_nom{ 512L };                 /**< nominal mid-poi
 
 int32_t l_DCoffset_V[NO_OF_PHASES]; /**< <--- for LPF */
 
-constexpr uint32_t WORKING_ZONE_IN_JOULES{ 3600UL }; /**< number of joule for 1Wh */
-
 /**< main energy bucket for 3-phase use, with units of Joules * SUPPLY_FREQUENCY */
 constexpr float f_capacityOfEnergyBucket_main{ static_cast< float >(WORKING_ZONE_IN_JOULES * SUPPLY_FREQUENCY) };
 /**< for resetting flexible thresholds */
@@ -239,8 +237,8 @@ void updatePhysicalLoadStates()
   {
     if (b_reOrderLoads)
     {
-      const auto temp{ loadPrioritiesAndState[0] };
       uint8_t i{ NO_OF_DUMPLOADS - 1 };
+      const auto temp{ loadPrioritiesAndState[i] };
       do
       {
         loadPrioritiesAndState[i] = loadPrioritiesAndState[i - 1];
@@ -255,10 +253,11 @@ void updatePhysicalLoadStates()
     {
       if (0x00 == (loadPrioritiesAndState[0] & loadStateOnBit))
       {
-        ++absenceOfDivertedEnergyCount;
+        EDD_isIdle = true;
       }
       else
       {
+        EDD_isIdle = false;
         absenceOfDivertedEnergyCount = 0;
       }
     }

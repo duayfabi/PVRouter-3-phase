@@ -18,19 +18,6 @@ static_assert(__cplusplus >= 201703L, "See also : https://github.com/FredM67/PVR
 
 // In this sketch, the ADC is free-running with a cycle time of ~104uS.
 
-//--------------------------------------------------------------------------------------------------
-#ifdef EMONESP
-#undef SERIALPRINT  // Must not corrupt serial output to emonHub with 'human-friendly' printout
-#undef SERIALOUT
-#endif
-
-#ifdef SERIALOUT
-#undef EMONESP
-#undef SERIALPRINT  // Must not corrupt serial output to emonHub with 'human-friendly' printout
-#undef ENABLE_DEBUG
-#endif
-//--------------------------------------------------------------------------------------------------
-
 #include "calibration.h"
 #include "processing.h"
 #include "types.h"
@@ -290,7 +277,7 @@ bool proceedLoadPrioritiesAndOverriding(const int16_t currentTemperature_x100)
   }
   else if constexpr (PRIORITY_ROTATION == RotationModes::AUTO)
   {
-    if (ROTATION_AFTER_CYCLES < absenceOfDivertedEnergyCount)
+    if (ROTATION_AFTER_SECONDS < absenceOfDivertedEnergyCount)
     {
       proceedRotation();
 
@@ -364,6 +351,11 @@ void loop()
     if (perSecondTimer >= SUPPLY_FREQUENCY)
     {
       perSecondTimer = 0;
+
+      if (EDD_isIdle)
+      {
+        ++absenceOfDivertedEnergyCount;
+      }
 
       if constexpr (WATCHDOG_PIN_PRESENT)
       {

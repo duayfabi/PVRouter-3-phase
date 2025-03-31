@@ -9,15 +9,26 @@
  *
  */
 
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <Arduino.h>
+
+#include "type_traits.hpp"
 
 #include "constants.h"
 
 // -------------------------------
 // definitions of enumerated types
+
+//--------------------------------------------------------------------------------------------------
+// Enum for serial output types
+enum class SerialOutputType
+{
+  HumanReadable, /**< Human-readable output for commissioning */
+  IoT,           /**< Output for HomeAssistant or similar */
+  EmonCMS        /**< Output in EmonCMS format */
+};
 
 /** Polarities */
 enum class Polarities : uint8_t
@@ -107,4 +118,4 @@ constexpr integral_constant< uint8_t, ival(Vs...) > operator""_i()
   return {};
 }
 
-#endif  // _TYPES_H
+#endif  // TYPES_H

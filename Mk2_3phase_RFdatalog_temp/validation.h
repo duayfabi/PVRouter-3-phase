@@ -9,8 +9,8 @@
  * 
  */
 
-#ifndef _VALIDATION_H
-#define _VALIDATION_H
+#ifndef VALIDATION_H
+#define VALIDATION_H
 
 #include "config_system.h"
 #include "utils_pins.h"
@@ -42,8 +42,11 @@ static_assert(!EMONESP_CONTROL || (DIVERSION_PIN_PRESENT && DIVERSION_PIN_PRESEN
 
 static_assert(!RELAY_DIVERSION | (60 / DATALOG_PERIOD_IN_SECONDS * DATALOG_PERIOD_IN_SECONDS == 60), "******** Wrong configuration. DATALOG_PERIOD_IN_SECONDS must be a divider of 60 ! ********");
 
-constexpr uint16_t
-check_pins()
+static_assert(NO_OF_DUMPLOADS > 0, "Number of dump loads must be greater than 0");
+static_assert(iTemperatureThreshold > 0, "Temperature threshold must be greater than 0");
+static_assert(iTemperatureThreshold <= 100, "Temperature threshold must be lower than 100");
+
+constexpr uint16_t check_pins()
 {
   uint16_t used_pins{ 0 };
 
@@ -91,7 +94,7 @@ check_pins()
     if (loadPin == 0xff)
       return 0;
 
-    if (bitRead(used_pins, loadPin))
+    if (bit_read(used_pins, loadPin))
       return 0;
 
     bit_set(used_pins, loadPin);
@@ -105,7 +108,7 @@ check_pins()
 
       if (relayPin != 0xff)
       {
-        if (bitRead(used_pins, relayPin))
+        if (bit_read(used_pins, relayPin))
           return 0;
 
         bit_set(used_pins, relayPin);
@@ -164,4 +167,4 @@ static_assert((check_pins() & 0xC000) == 0, "******** Pins 14 and/or 15 do not e
 static_assert(!(RF_CHIP_PRESENT && ((check_pins() & 0x3C04) != 0)), "******** Pins from RF chip are reserved ! Please check your config ! ********");
 static_assert(check_relay_pins(), "******** Wrong pin(s) configuration for relay(s) ********");
 
-#endif
+#endif /* VALIDATION_H */

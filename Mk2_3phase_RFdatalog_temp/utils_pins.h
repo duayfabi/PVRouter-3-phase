@@ -9,8 +9,8 @@
  * 
  */
 
-#ifndef __UTILS_PINS_H__
-#define __UTILS_PINS_H__
+#ifndef UTILS_PINS_H
+#define UTILS_PINS_H
 
 #include <Arduino.h>
 
@@ -23,7 +23,7 @@ inline void setPinsON(const uint16_t pins);
 inline constexpr void setPinOFF(const uint8_t pin);
 inline void setPinsOFF(const uint16_t pins);
 
-inline bool getPinState(const uint8_t pin);
+inline constexpr bool getPinState(const uint8_t pin);
 #else
 inline constexpr void togglePin(const uint8_t pin) __attribute__((always_inline));
 
@@ -33,7 +33,7 @@ inline void setPinsON(const uint16_t pins) __attribute__((always_inline));
 inline constexpr void setPinOFF(const uint8_t pin) __attribute__((always_inline));
 inline void setPinsOFF(const uint16_t pins) __attribute__((always_inline));
 
-inline bool getPinState(const uint8_t pin) __attribute__((always_inline));
+inline constexpr bool getPinState(const uint8_t pin) __attribute__((always_inline));
 #endif
 
 /**
@@ -171,9 +171,9 @@ inline void setPinsOFF(const uint16_t pins)
  * @return true if HIGH
  * @return false if LOW
  */
-inline bool getPinState(const uint8_t pin)
+inline constexpr bool getPinState(const uint8_t pin)
 {
-  return (pin < 8) ? bitRead(PIND, pin) : bitRead(PINB, pin - 8);
+  return (pin < 8) ? bit_read(PIND, pin) : bit_read(PINB, pin - 8);
 }
 
-#endif  // __UTILS_PINS_H__
+#endif  // UTILS_PINS_H
