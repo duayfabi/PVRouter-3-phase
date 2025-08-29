@@ -9,8 +9,11 @@
  *
  */
 
-#ifndef _UTILS_H
-#define _UTILS_H
+#ifndef UTILS_H
+#define UTILS_H
+
+#include <Arduino.h>
+#include <ArduinoJson.h>
 
 #include "FastDivision.h"
 
@@ -18,14 +21,28 @@
 #include "constants.h"
 #include "dualtariff.h"
 #include "processing.h"
+#include "shared_var.h"
 #include "teleinfo.h"
 
 #include "utils_rf.h"
 #include "utils_temp.h"
 
+#include "version.h"
+
 /**
- * @brief Print the configuration during start
+ * @brief Print the configuration during startup.
  *
+ * This function outputs the system configuration to the Serial output during startup.
+ * It includes details about the sketch, build information, electrical settings, and
+ * enabled features.
+ *
+ * @details
+ * - Prints the sketch ID, branch name, commit hash, and build date/time.
+ * - Outputs electrical settings such as power calibration, voltage calibration, and phase calibration.
+ * - Displays enabled features like temperature sensing, dual tariff, load rotation, relay diversion, and RF communication.
+ * - Logs the selected datalogging format (Human-readable, IoT, or JSON).
+ *
+ * @ingroup Initialization
  */
 inline void printConfiguration()
 {
@@ -142,17 +159,17 @@ inline void printConfiguration()
 #endif
 
   DBUG(F("Datalogging capability "));
-  if constexpr(SERIAL_OUTPUT_TYPE == SerialOutputType::HumanReadable)
+  if constexpr (SERIAL_OUTPUT_TYPE == SerialOutputType::HumanReadable)
   {
     DBUGLN(F("in Human-readable format"));
   }
-  else if constexpr(SERIAL_OUTPUT_TYPE == SerialOutputType::IoT)
+  else if constexpr (SERIAL_OUTPUT_TYPE == SerialOutputType::IoT)
   {
     DBUGLN(F("in IoT format"));
   }
-  else if constexpr(SERIAL_OUTPUT_TYPE == SerialOutputType::EmonCMS)
+  else if constexpr (SERIAL_OUTPUT_TYPE == SerialOutputType::JSON)
   {
-    DBUGLN(F("in EmonCMS format"));
+    DBUGLN(F("in JSON format"));
   }
   else
   {
@@ -161,38 +178,61 @@ inline void printConfiguration()
 }
 
 /**
- * @brief Write on Serial in EmonESP format
- * 
- * @param bOffPeak state of on/off-peak period
+ * @brief Write telemetry data to Serial in JSON format.
+ *
+ * This function outputs telemetry data in a format compatible with JSON, including
+ * power, voltage, load states, temperature, and tariff information.
+ *
+ * @param bOffPeak Indicates whether the system is in an off-peak tariff period.
+ *
+ * @details
+ * - Outputs total power and phase-specific power.
+ * - Includes load ON percentages for each load.
+ * - Outputs temperature data if temperature sensing is enabled.
+ * - Includes tariff information if dual tariff is enabled.
+ *
+ * @ingroup Telemetry
  */
-inline void printForEmonCMS(const bool bOffPeak)
+inline void printForJSON(const bool bOffPeak)
 {
-  uint8_t idx{ 0 };
+  ArduinoJson::StaticJsonDocument< 256 > doc;
 
   // Total mean power over a data logging period
-  Serial.print(F("P:"));
-  Serial.print(tx_data.power);
+  doc["P"] = tx_data.power;
 
-  // Mean power for each phase over a data logging period
-  for (idx = 0; idx < NO_OF_PHASES; ++idx)
+  if constexpr (RELAY_DIVERSION)
   {
-    Serial.print(F(",P"));
-    Serial.print(idx + 1);
-    Serial.print(F(":"));
-    Serial.print(tx_data.power_L[idx]);
+    doc["R"] = relays.get_average();
   }
+
+  if constexpr (NO_OF_PHASES == 3)
+  {
+    // Mean power for each phase over a data logging period
+    doc["P1"] = tx_data.power_L[0];
+    doc["P2"] = tx_data.power_L[1];
+    doc["P3"] = tx_data.power_L[2];
+  }
+  else if constexpr (NO_OF_PHASES == 2)
+  {
+    // Mean power for each phase over a data logging period
+    doc["P1"] = tx_data.power_L[0];
+    doc["P2"] = tx_data.power_L[1];
+  }
+  else
+    static_assert(NO_OF_PHASES != 1, "Unsupported number of phases");
+
   // Mean power for each load over a data logging period (in %)
-  for (idx = 0; idx < NO_OF_DUMPLOADS; ++idx)
-  {
-    Serial.print(F(",L"));
-    Serial.print(idx + 1);
-    Serial.print(F(":"));
-    Serial.print(copyOf_countLoadON[idx] * 100 * invDATALOG_PERIOD_IN_MAINS_CYCLES);
-  }
+  //for (idx = 0; idx < NO_OF_DUMPLOADS; ++idx)
+  //{
+  //  Serial.print(F(",L"));
+  //  Serial.print(idx + 1);
+  //  Serial.print(F(":"));
+  //  Serial.print(copyOf_countLoadON[idx] * 100 * invDATALOG_PERIOD_IN_MAINS_CYCLES);
+  //}
 
   if constexpr (TEMP_SENSOR_PRESENT)
   {  // Current temperature
-    for (idx = 0; idx < temperatureSensing.get_size(); ++idx)
+    for (uint8_t idx = 0; idx < temperatureSensing.get_size(); ++idx)
     {
       if ((OUTOFRANGE_TEMPERATURE == tx_data.temperature_x100[idx])
           || (DEVICE_DISCONNECTED_RAW == tx_data.temperature_x100[idx]))
@@ -200,31 +240,38 @@ inline void printForEmonCMS(const bool bOffPeak)
         continue;
       }
 
-      Serial.print(F(",T"));
-      Serial.print(idx + 1);
-      Serial.print(F(":"));
-      Serial.print(tx_data.temperature_x100[idx] * 0.01F);
+      doc[String("T") + (idx + 1)] = (float)tx_data.temperature_x100[idx] * 0.01F;
     }
   }
 
   if constexpr (DUAL_TARIFF)
   {
     // Current tariff
-    Serial.print(F(",T:"));
-    Serial.print(bOffPeak ? "low" : "high");
+    doc["TA"] = bOffPeak ? "low" : "high";
   }
-  Serial.println(F(""));
+
+  serializeJson(doc, Serial);
+  Serial.println();
 }
 
 /**
- * @brief Prints data logs to the Serial output in text format
+ * @brief Prints data logs to the Serial output in text format.
  *
+ * This function outputs telemetry data in a human-readable text format to the Serial output.
+ * It includes information about power, voltage, temperature, and system performance metrics.
+ *
+ * @details
+ * - Prints total power, phase-specific power, and RMS voltage for each phase.
+ * - Includes temperature data if temperature sensing is enabled.
+ * - Outputs additional system metrics like the number of sample sets and absence of diverted energy count.
+ *
+ * @ingroup Telemetry
  */
 inline void printForSerialText()
 {
   uint8_t phase{ 0 };
 
-  Serial.print(copyOf_energyInBucket_main * invSUPPLY_FREQUENCY);
+  Serial.print(Shared::copyOf_energyInBucket_main * invSUPPLY_FREQUENCY);
   Serial.print(F(", P:"));
   Serial.print(tx_data.power);
 
@@ -267,14 +314,14 @@ inline void printForSerialText()
   }
 
   Serial.print(F(", (minSampleSets/MC "));
-  Serial.print(copyOf_lowestNoOfSampleSetsPerMainsCycle);
+  Serial.print(Shared::copyOf_lowestNoOfSampleSetsPerMainsCycle);
   Serial.print(F(", #ofSampleSets "));
-  Serial.print(copyOf_sampleSetsDuringThisDatalogPeriod);
+  Serial.print(Shared::copyOf_sampleSetsDuringThisDatalogPeriod);
 #ifndef DUAL_TARIFF
   if constexpr (PRIORITY_ROTATION != RotationModes::OFF)
   {
     Serial.print(F(", NoED "));
-    Serial.print(absenceOfDivertedEnergyCount);
+    Serial.print(Shared::absenceOfDivertedEnergyCountInSeconds);
   }
 #endif  // DUAL_TARIFF
   Serial.println(F(")"));
@@ -306,7 +353,7 @@ inline void printForSerialText()
 void sendTelemetryData()
 {
   static TeleInfo teleInfo;
-  uint8_t idx = 0;
+  uint8_t idx{ 0 };
 
   teleInfo.startFrame();  // Start a new telemetry frame
 
@@ -332,9 +379,9 @@ void sendTelemetryData()
   idx = 0;
   do
   {
-    teleInfo.send("L", copyOf_countLoadON[idx] * 100 * invDATALOG_PERIOD_IN_MAINS_CYCLES, idx + 1);  // Send load ON count for each load
+    teleInfo.send("D", Shared::copyOf_countLoadON[idx] * 100 * invDATALOG_PERIOD_IN_MAINS_CYCLES, idx + 1);  // Send load ON count for each load
   } while (++idx < NO_OF_DUMPLOADS);
-  
+
   if constexpr (TEMP_SENSOR_PRESENT)
   {
     for (uint8_t idx = 0; idx < temperatureSensing.get_size(); ++idx)
@@ -348,15 +395,30 @@ void sendTelemetryData()
     }
   }
 
-  teleInfo.send("N", static_cast< int16_t >(absenceOfDivertedEnergyCount));  // Send absence of diverted energy count for 50Hz
+  teleInfo.send("N", static_cast< int16_t >(Shared::absenceOfDivertedEnergyCountInSeconds));  // Send absence of diverted energy count for 50Hz
+
+  teleInfo.send("S", Shared::copyOf_sampleSetsDuringThisDatalogPeriod);
+  teleInfo.send("S_MC", Shared::copyOf_lowestNoOfSampleSetsPerMainsCycle);
 
   teleInfo.endFrame();  // Finalize and send the telemetry frame
 }
 
 /**
- * @brief Prints data logs to the Serial output in text or json format
+ * @brief Prints or sends telemetry data logs based on the selected output format.
  *
- * @param bOffPeak true if off-peak tariff is active
+ * This function handles the transmission of telemetry data in various formats, such as
+ * human-readable text, IoT telemetry, or JSON format. It also ensures that the first
+ * incomplete datalogging event is skipped during startup.
+ *
+ * @param bOffPeak Indicates whether the system is in an off-peak tariff period.
+ *
+ * @details
+ * - If RF communication is enabled, it sends RF data.
+ * - Depending on the `SERIAL_OUTPUT_TYPE`, it prints data in text format, sends telemetry
+ *   data, or outputs data in JSON format.
+ * - Skips the first datalogging event during startup to avoid incomplete data.
+ *
+ * @ingroup GeneralProcessing
  */
 inline void sendResults(bool bOffPeak)
 {
@@ -380,15 +442,24 @@ inline void sendResults(bool bOffPeak)
   {
     sendTelemetryData();
   }
-  else if constexpr (SERIAL_OUTPUT_TYPE == SerialOutputType::EmonCMS)
+  else if constexpr (SERIAL_OUTPUT_TYPE == SerialOutputType::JSON)
   {
-    printForEmonCMS(bOffPeak);
+    printForJSON(bOffPeak);
   }
 }
 
 /**
  * @brief Prints the load priorities to the Serial output.
  *
+ * This function logs the current load priorities and states to the Serial output
+ * for debugging purposes. It provides a detailed view of the load configuration
+ * and their respective priorities.
+ *
+ * @details
+ * - Each load's priority and state are printed in a human-readable format.
+ * - This function is only active when debugging is enabled (`ENABLE_DEBUG`).
+ *
+ * @ingroup GeneralProcessing
  */
 inline void logLoadPriorities()
 {
@@ -405,9 +476,15 @@ inline void logLoadPriorities()
 }
 
 /**
- * @brief Get the available RAM during setup
+ * @brief Get the available RAM during setup.
  *
- * @return int The amount of free RAM
+ * This function calculates the amount of free RAM available in the system.
+ * It is useful for debugging and ensuring that the system has sufficient memory
+ * for proper operation.
+ *
+ * @return int The amount of free RAM in bytes.
+ *
+ * @ingroup Debugging
  */
 inline int freeRam()
 {

@@ -1,3 +1,5 @@
+permissions:
+  contents: read
 name: Spell Check
 
 on:
@@ -13,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # See: https://github.com/codespell-project/actions-codespell/blob/master/README.md
       - name: Spell check
