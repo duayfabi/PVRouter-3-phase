@@ -26,7 +26,7 @@ def write_version_h(file_path, project_path, current_time, branch_name, commit_h
 #define BRANCH_NAME "{branch_name}"
 #define COMMIT_HASH "{commit_hash}"
 
-#endif // VERSION_H
+#endif  // VERSION_H
 """
     # Only write to the file if the content has changed
     if not os.path.exists(file_path) or open(file_path).read() != content:
