@@ -4,9 +4,9 @@
  * @brief Some utility functions for the relay output feature
  * @version 0.1
  * @date 2023-03-31
- * 
+ *
  * @copyright Copyright (c) 2023
- * 
+ *
  */
 
 #ifndef UTILS_RELAY_H
@@ -17,13 +17,24 @@
 #include "debug.h"
 
 #include "config_system.h"
-#include "movingAvg.h"
 #include "ewma_avg.hpp"
 #include "utils_pins.h"
 
 /**
- * @brief Relay diversion config and engine
- * 
+ * @class relayOutput
+ * @brief Represents a single relay configuration and its behavior.
+ *
+ * The `relayOutput` class encapsulates the configuration and state management
+ * of a single relay. It provides methods to control the relay based on surplus
+ * and import thresholds, as well as minimum ON/OFF durations.
+ *
+ * @details
+ * - **Relay Control**: The relay is turned ON when the surplus threshold is exceeded
+ *   and turned OFF when the import threshold is crossed.
+ * - **Time Constraints**: Minimum ON and OFF durations ensure stable operation.
+ * - **State Management**: The class tracks the relay's current state and the duration
+ *   of its current state.
+ *
  * @ingroup RelayDiversion
  */
 class relayOutput
@@ -33,7 +44,7 @@ public:
 
   /**
    * @brief Construct a new relay Config object with default parameters
-   * 
+   *
    * @param _relay_pin Control pin for the relay
    */
   explicit constexpr relayOutput(const uint8_t _relay_pin)
@@ -43,34 +54,40 @@ public:
 
   /**
    * @brief Construct a new relay Config object with default/custom parameters
-   * 
+   *
    * @param _relay_pin Control pin for the relay
-   * @param _surplusThreshold Surplus threshold to turn relay ON
+   * @param _surplusThreshold Surplus threshold to turn relay ON (positive value, e.g., 1000)
    * @param _importThreshold Import threshold to turn relay OFF
+   *        - Positive values: turn OFF when importing > threshold (normal installations)
+   *        - Negative values: turn OFF when surplus < abs(threshold) (battery systems)
+   *        - Zero: turn OFF when importing > 0W (problematic with batteries)
    */
   constexpr relayOutput(uint8_t _relay_pin, int16_t _surplusThreshold, int16_t _importThreshold)
-    : relay_pin{ _relay_pin }, surplusThreshold{ -abs(_surplusThreshold) }, importThreshold{ abs(_importThreshold) }
+    : relay_pin{ _relay_pin }, surplusThreshold{ -abs(_surplusThreshold) }, importThreshold{ _importThreshold }
   {
   }
 
   /**
    * @brief Construct a new relay Config object with custom parameters
-   * 
+   *
    * @param _relay_pin Control pin for the relay
-   * @param _surplusThreshold Surplus threshold to turn relay ON
+   * @param _surplusThreshold Surplus threshold to turn relay ON (positive value, e.g., 1000)
    * @param _importThreshold Import threshold to turn relay OFF
+   *        - Positive values: turn OFF when importing > threshold (normal installations)
+   *        - Negative values: turn OFF when surplus < abs(threshold) (battery systems)
+   *        - Zero: turn OFF when importing > 0W (problematic with batteries)
    * @param _minON Minimum duration in minutes to leave relay ON
    * @param _minOFF Minimum duration in minutes to leave relay OFF
    */
   constexpr relayOutput(uint8_t _relay_pin, int16_t _surplusThreshold, int16_t _importThreshold, uint16_t _minON, uint16_t _minOFF)
-    : relay_pin{ _relay_pin }, surplusThreshold{ -abs(_surplusThreshold) }, importThreshold{ abs(_importThreshold) }, minON{ _minON * 60 }, minOFF{ _minOFF * 60 }
+    : relay_pin{ _relay_pin }, surplusThreshold{ -abs(_surplusThreshold) }, importThreshold{ _importThreshold }, minON{ _minON * 60 }, minOFF{ _minOFF * 60 }
   {
   }
 
   /**
    * @brief Get the control pin of the relay
-   * 
-   * @return constexpr auto 
+   *
+   * @return constexpr auto
    */
   constexpr auto get_pin() const
   {
@@ -79,8 +96,8 @@ public:
 
   /**
    * @brief Get the surplus threshold which will turns ON the relay
-   * 
-   * @return constexpr auto 
+   *
+   * @return constexpr auto
    */
   constexpr auto get_surplusThreshold() const
   {
@@ -89,8 +106,8 @@ public:
 
   /**
    * @brief Get the import threshold which will turns OFF the relay
-   * 
-   * @return constexpr auto 
+   *
+   * @return constexpr auto
    */
   constexpr auto get_importThreshold() const
   {
@@ -99,8 +116,8 @@ public:
 
   /**
    * @brief Get the minimum ON-time in seconds
-   * 
-   * @return constexpr auto 
+   *
+   * @return constexpr auto
    */
   constexpr auto get_minON() const
   {
@@ -109,8 +126,8 @@ public:
 
   /**
    * @brief Get the minimum OFF-time in seconds
-   * 
-   * @return constexpr auto 
+   *
+   * @return constexpr auto
    */
   constexpr auto get_minOFF() const
   {
@@ -119,8 +136,8 @@ public:
 
   /**
    * @brief Return the state
-   * 
-   * @return auto 
+   *
+   * @return auto
    */
   auto isRelayON() const
   {
@@ -130,7 +147,7 @@ public:
   /**
    * @brief Increment the duration of the current state
    * @details This function must be called every second.
-   * 
+   *
    */
   void inc_duration() const
   {
@@ -142,26 +159,47 @@ public:
 
   /**
    * @brief Proceed with the relay
-   * 
+   *
+   * @param currentAvgPower Current average power
+   * @param overrideBitmask Reference to override bitmask
    * @return bool True if state has changed
    */
-  bool proceed_relay(const int32_t currentAvgPower) const
+  bool proceed_relay(const int32_t currentAvgPower, uint16_t& overrideBitmask) const
   {
+    const bool isOverrideActive = bit_read(overrideBitmask, relay_pin);
+
     // To avoid changing sign, surplus is a negative value
-    if (currentAvgPower < surplusThreshold)
+    // Turn ON if surplus threshold is met OR if override is active
+    if (currentAvgPower < surplusThreshold || isOverrideActive)
     {
+      bit_clear(overrideBitmask, relay_pin);  // Clear override bit if it was set
       return try_turnON();
     }
-    if (currentAvgPower > importThreshold)
+
+    // Handle both positive and negative import thresholds
+    if (importThreshold >= 0)
     {
-      return try_turnOFF();
+      // Positive threshold: turn OFF when importing > threshold (normal mode)
+      if (currentAvgPower > importThreshold)
+      {
+        return try_turnOFF();
+      }
     }
+    else
+    {
+      // Negative threshold: turn OFF when surplus < abs(threshold) (battery mode)
+      if (currentAvgPower > importThreshold)  // importThreshold is negative, so this checks surplus < abs(threshold)
+      {
+        return try_turnOFF();
+      }
+    }
+
     return false;
   }
 
   /**
    * @brief Print the configuration of the current relay-diversion
-   * 
+   *
    */
   void printRelayConfiguration(uint8_t idx) const
   {
@@ -175,7 +213,17 @@ public:
     Serial.println(get_surplusThreshold());
 
     Serial.print(F("\t\tImport threshold: "));
-    Serial.println(get_importThreshold());
+    Serial.print(get_importThreshold());
+    if (get_importThreshold() >= 0)
+    {
+      Serial.println(F(" (import mode)"));
+    }
+    else
+    {
+      Serial.print(F(" (surplus mode: turn OFF when surplus < "));
+      Serial.print(-get_importThreshold());
+      Serial.println(F("W)"));
+    }
 
     Serial.print(F("\t\tMinimum working time in minutes: "));
     Serial.println(get_minON() / 60);
@@ -187,7 +235,7 @@ public:
 private:
   /**
    * @brief Turn ON the relay if the 'time' condition is met
-   * 
+   *
    * @return bool True if state has changed
    */
   bool try_turnON() const
@@ -209,7 +257,7 @@ private:
 
   /**
    * @brief Turn OFF the relay if the 'time' condition is met
-   * 
+   *
    * @return bool True if state has changed
    */
   bool try_turnOFF() const
@@ -230,9 +278,9 @@ private:
   }
 
 private:
-  const uint8_t relay_pin{ 0xff };         /**< Pin associated with the relay */
+  const uint8_t relay_pin{ unused_pin };   /**< Pin associated with the relay */
   const int16_t surplusThreshold{ -1000 }; /**< Surplus threshold to turn relay ON */
-  const int16_t importThreshold{ 200 };    /**< Import threshold to turn relay OFF */
+  const int16_t importThreshold{ 200 };    /**< Import threshold to turn relay OFF (positive = import mode, negative = surplus mode) */
   const uint16_t minON{ 5 * 60 };          /**< Minimum duration in seconds the relay is turned ON */
   const uint16_t minOFF{ 5 * 60 };         /**< Minimum duration in seconds the relay is turned OFF */
 
@@ -241,11 +289,25 @@ private:
 };
 
 /**
- * @brief This class implements the relay management engine
- * 
- * @tparam D The duration in minutes of the sliding average
- * @tparam N The number of relays to be used. This parameter is deduced automatically.
- * 
+ * @class RelayEngine
+ * @brief Manages a collection of relays and their behavior based on surplus and import thresholds.
+ *
+ * The `RelayEngine` class provides functionality to manage multiple relays, including their
+ * initialization, state transitions, and configuration. It uses a sliding average to determine
+ * the current power state and adjusts the relays accordingly.
+ *
+ * @tparam N The number of relays to be managed.
+ * @tparam D The duration in minutes for the sliding average (default is 10 minutes).
+ *
+ * @details
+ * - **Relay Management**: Handles the state of multiple relays, turning them ON or OFF based
+ *   on surplus and import thresholds.
+ * - **Sliding Average**: Uses an Exponentially Weighted Moving Average (EWMA) to calculate
+ *   the average power over a configurable duration.
+ * - **State Transitions**: Ensures stable operation by enforcing minimum ON/OFF durations
+ *   and a delay between state changes.
+ * - **Initialization**: Provides methods to initialize relay pins and print their configuration.
+ *
  * @ingroup RelayDiversion
  */
 template< uint8_t N, uint8_t D = 10 >
@@ -254,7 +316,7 @@ class RelayEngine
 public:
   /**
    * @brief Construct a list of relays
-   * 
+   *
    */
   explicit constexpr RelayEngine(const relayOutput (&ref)[N])
     : relay(ref)
@@ -262,27 +324,29 @@ public:
   }
 
   /**
-   * @brief Construct a list of relays with a custom sliding average
-   * 
+   * @brief Construct a list of relays with a custom sliding average.
+   *
+   * @param ic Integral constant representing the sliding average duration.
+   * @param ref Array of relay configurations.
    */
-  constexpr RelayEngine(integral_constant< uint8_t, D > ic, const relayOutput (&ref)[N])
+  constexpr RelayEngine(integral_constant< uint8_t, D > /* ic */, const relayOutput (&ref)[N])
     : relay(ref)
   {
   }
 
   /**
    * @brief Get the number of relays
-   * 
+   *
    * @return constexpr auto The number of relays
    */
-  constexpr auto get_size() const
+  constexpr auto size() const
   {
     return N;
   }
 
   /**
    * @brief Get the relay object
-   * 
+   *
    * @tparam idx The index of the relay
    * @return constexpr const auto& The relay object
    */
@@ -293,17 +357,17 @@ public:
 
   /**
    * @brief Get the current average
-   * 
+   *
    * @return auto The current average
    */
   inline static auto get_average()
   {
-    return ewma_average.getAverageS();
+    return ewma_average.getAverageT();  // Use TEMA for better cloud immunity
   }
 
   /**
    * @brief Update the sliding average
-   * 
+   *
    * @param currentPower Current power at the grid
    */
   inline static void update_average(int16_t currentPower)
@@ -311,9 +375,11 @@ public:
     ewma_average.addValue(currentPower);
   }
 
-/**
-   * @brief Increment the duration's state of each relay
-   * 
+  /**
+   * @brief Increment the duration's state of each relay.
+   *
+   * @details This method updates the duration of the current state for each relay and decreases
+   * the delay (`settle_change`) until the next state change is allowed.
    */
 #if defined(__DOXYGEN__)
   void inc_duration() const;
@@ -322,10 +388,16 @@ public:
 #endif
 
   /**
-   * @brief Proceed all relays in increasing order (surplus) or decreasing order (import)
-   * 
+   * @brief Proceed all relays in increasing order (surplus) or decreasing order (import).
+   *
+   * @param overrideBitmask Reference to override bitmask - relay bits will be cleared after processing
+   *
+   * @details This method adjusts the state of the relays based on the current average power.
+   * If surplus power is available, it tries to turn ON relays in increasing order. If power
+   * is being imported, it tries to turn OFF relays in decreasing order.
+   * Override bits for individual relays are handled and cleared during processing.
    */
-  void proceed_relays() const
+  void proceed_relays(uint16_t& overrideBitmask) const
   {
     if (settle_change != 0)
     {
@@ -333,13 +405,13 @@ public:
       return;
     }
 
-    if (ewma_average.getAverageS() > 0)
+    if (ewma_average.getAverageT() > 0)
     {
       // Currently importing, try to turn OFF some relays
       uint8_t idx{ N };
       do
       {
-        if (relay[--idx].proceed_relay(ewma_average.getAverageS()))
+        if (relay[--idx].proceed_relay(ewma_average.getAverageT(), overrideBitmask))
         {
           settle_change = 60;
           return;
@@ -352,7 +424,7 @@ public:
       uint8_t idx{ 0 };
       do
       {
-        if (relay[idx].proceed_relay(ewma_average.getAverageS()))
+        if (relay[idx].proceed_relay(ewma_average.getAverageT(), overrideBitmask))
         {
           settle_change = 60;
           return;
@@ -362,27 +434,15 @@ public:
   }
 
   /**
-   * @brief Initialize the pins used by the relays
-   * 
+   * @brief Print the configuration of each relay.
+   *
+   * @details This method outputs the configuration of all relays, including their pin assignments,
+   * thresholds, and minimum ON/OFF durations, to the Serial interface.
    */
-  void initializePins() const
+  void printRelayEngineConfiguration() const
   {
-    uint8_t idx{ N };
-    do
-    {
-      pinMode(relay[--idx].get_pin(), OUTPUT);
-      delay(100);
-    } while (idx);
-  }
-
-  /**
-   * @brief Print the configuration of each relay
-   * 
-   */
-  void printConfiguration() const
-  {
-    Serial.println(F("\t*** Relay(s) configuration ***"));
-    Serial.print(F("\t\tSliding average: "));
+    Serial.println(F("*** Relay(s) configuration ***"));
+    Serial.print(F("\tSliding average: "));
     Serial.println(D);
 
     for (uint8_t i = 0; i < N; ++i)
@@ -412,5 +472,12 @@ template< uint8_t N, uint8_t D > void RelayEngine< N, D >::inc_duration() const
     --settle_change;
   }
 }
+
+// Deduction guides for automatic template parameter deduction
+template< uint8_t N >
+RelayEngine(const relayOutput (&)[N]) -> RelayEngine< N, 10 >;
+
+template< uint8_t N, uint8_t D >
+RelayEngine(integral_constant< uint8_t, D >, const relayOutput (&)[N]) -> RelayEngine< N, D >;
 
 #endif /* UTILS_RELAY_H */

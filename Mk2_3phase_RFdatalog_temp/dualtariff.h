@@ -21,7 +21,7 @@
  *
  * @tparam N # of loads
  * @tparam D
- * 
+ *
  * @ingroup DualTariff
  */
 template< uint8_t N, uint8_t OffPeakDuration = 8 >
@@ -50,7 +50,7 @@ public:
       }
     }
   }
-  const auto (&operator[](uint8_t i) const)
+  const auto& operator[](uint8_t i) const
   {
     return _rg[i];
   }

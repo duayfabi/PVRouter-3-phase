@@ -3,6 +3,7 @@
 [![GitHub issues](https://img.shields.io/github/issues/FredM67/PVRouter-3-phase)](https://github.com/FredM67/PVRouter-3-phase/issues)
 [![GitHub forks](https://img.shields.io/github/forks/FredM67/PVRouter-3-phase)](https://github.com/FredM67/PVRouter-3-phase/network)
 [![GitHub stars](https://img.shields.io/github/stars/FredM67/PVRouter-3-phase)](https://github.com/FredM67/PVRouter-3-phase/stargazers)
+[![CI](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/build.yml/badge.svg)](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/build.yml)
 [![CodeQL](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/codeql.yml/badge.svg)](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/codeql.yml)
 [![Doxygen](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/doxygen-gh-pages.yml/badge.svg)](https://github.com/FredM67/PVRouter-3-phase/actions/workflows/doxygen-gh-pages.yml)
 <br/>
@@ -17,7 +18,7 @@
 
 My version of the 3-phase Mk2PVRouter firmware (see <http://www.mk2pvrouter.co.uk>).
 
-Robin Emley already proposes a 3 phase PV-router (<https://www.mk2pvrouter.co.uk/3-phase-version.html>).  
+Robin Emley already proposes a 3 phase PV-router (<https://www.mk2pvrouter.co.uk/3-phase-version.html>).
 It supports up to 12 resistive output loads, which are completely independent.
 
 ---
@@ -29,19 +30,18 @@ It supports up to 12 resistive output loads, which are completely independent.
   - [Photo Gallery](#photo-gallery)
   - [Schematic of the mainboard](#schematic-of-the-mainboard)
   - [Implementation documentation](#implementation-documentation)
+  - [Analysis and Tools Documentation](#analysis-and-tools-documentation)
   - [End-user documentation](#end-user-documentation)
     - [Overview](#overview)
     - [Load priorities management](#load-priorities-management)
     - [Off-peak period detection](#off-peak-period-detection)
-    - [Force full power](#force-full-power)
+    - [Boost](#boost)
     - [Temperature sensor](#temperature-sensor)
     - [Enphase zero-export profile](#enphase-zero-export-profile)
 - [How to wire the router](#how-to-wire-the-router)
 - [Use cases](#use-cases)
   - [Requirements](#requirements)
   - [Heater with mechanical thermostat](#heater-with-mechanical-thermostat)
-      - [Migrate from single-phase to 3-phase (with neutral wire)](#migrate-from-single-phase-to-3-phase-with-neutral-wire)
-      - [Wiring](#wiring)
   - [Heater with ACI single phase thermostat](#heater-with-aci-single-phase-thermostat)
   - [Heater with ACI 3-phase thermostat (without neutral wire)](#heater-with-aci-3-phase-thermostat-without-neutral-wire)
   - [Alternatives WITHOUT neutral wire](#alternatives-without-neutral-wire)
@@ -63,6 +63,19 @@ It supports up to 12 resistive output loads, which are completely independent.
 
 You can start reading the documentation here [3-phase diverter](https://fredm67.github.io/PVRouter-3-phase/html/index.html).
 
+## Analysis and Tools Documentation
+
+📊 **[Analysis Tools and Technical Documentation](analysis/README.en.md)** [![fr](https://img.shields.io/badge/lang-fr-blue.svg)](analysis/README.md)
+
+This section contains advanced analysis tools and technical documentation for:
+
+- **🔄 EWMA/TEMA Filtering**: Cloud immunity analysis and filter optimization
+- **📈 Performance Analysis**: Visualization scripts and benchmarks
+- **⚙️ Tuning Guide**: Documentation for parameter optimization
+- **📊 Technical Charts**: Visual comparisons of filtering algorithms
+
+> **Advanced Users:** These tools will help you understand and optimize PV router behavior, especially for installations with variable solar production or battery systems.
+
 ## End-user documentation
 
 ### Overview
@@ -76,7 +89,7 @@ Added functionalities:
 
 - load priorities management (configurable)
 - off-peak period detection (configurable)
-- force full power
+- boost
 - temperature sensor (just reading for the moment)
 - optimized (RF) data logging
 - serial output in JSON or TXT
@@ -96,32 +109,32 @@ Each day, the load priorities are rotated, so over many days, all the heating el
 
 Depending on the country, some energy meters provide a switch/relay which toggles on at the beginning of the off-peak period. It is intended to control a relay. If you wire it to a free digital pin of the router (in my case D3), you can detect off-peak/peak period.
 
-### Force full power
+### Boost
 
-Support has been added to force full power on specific loads. Each load can be forced independently from each other, start time and duration can be set individually.
+Support has been added to boost specific loads. Each load can be boosted independently from each other, start time and duration can be set individually.
 
 In my variant, that's used to switch the heater one during off-peak period if not enough surplus has been routed during the day. Here, to optimize the behavior, a temp-sensor will be used to check the temperature of the water and decide to switch on or not during night.
 
 ### Temperature sensor
 
-For the moment, just reading. It'll be used to optimize force full power, to make the right decision during night.
+For the moment, just reading. It'll be used to optimize boost, to make the right decision during night.
 
 ### Enphase zero-export profile
 
 When zero-export settings is enabled, the PV system curtails power production if the production of the system exceeds the consumption needs of the site. This ensures zero feed into the grid.
 
-As a side effect, the diverter won't see at any time surplus of energy.  
+As a side effect, the diverter won't see at any time surplus of energy.
 So the idea is to apply a certain offset to the energy measured by the diverter.
-As it is already commented in the code, after setting a negative value to *REQUIRED_EXPORT_IN_WATTS*, the diverter will act as a PV generator.  
-If you set a value of -20, each time the diverter measures the energy flowing, it'll add *-20* to the measurements.  
+As it is already commented in the code, after setting a negative value to *REQUIRED_EXPORT_IN_WATTS*, the diverter will act as a PV generator.
+If you set a value of -20, each time the diverter measures the energy flowing, it'll add *-20* to the measurements.
 
 So, now let see what happen in a couple of cases:
 
 - measured value is **positive** (energy import = no surplus), after adding *-20*, it stays positive, the diverter doesn't do anything. By a value between -20 and 0, the diverter won't do anything either.
-- measured value is **around zero**. In this situation, the "zero export profile" limitation is active.  
-After adding *-20*, we get a negative value that will make the diverter start diverting energy to the water heater.  
-Now, there's a sort of chain reaction. The Envoy detects more consumption, decides to raise production.  
-On the next measurement, the diverter measures again a value around zero, add again *-20*, and diverts even more energy.  
+- measured value is **around zero**. In this situation, the "zero export profile" limitation is active.
+After adding *-20*, we get a negative value that will make the diverter start diverting energy to the water heater.
+Now, there's a sort of chain reaction. The Envoy detects more consumption, decides to raise production.
+On the next measurement, the diverter measures again a value around zero, add again *-20*, and diverts even more energy.
 When production (and surplus) gets to the maximum possible, the measured value will stay around zero+ and the system is stable.
 
 This has been tested in real by Amorim. Depending of each situation, it might be necessary to tweak this value of *-20* to a bigger or smaller value.
@@ -146,7 +159,7 @@ To change your single-phase water heater to 3-phase, it MUST support 3-phase wir
 ---
 **_Safety Warning_**
 
-To modify the existing wiring, access to 240V mains voltage is required.  
+To modify the existing wiring, access to 240V mains voltage is required.
 Please take great care, and do not undertake this stage unless you feel confident to do so.
 
 ---
@@ -162,7 +175,7 @@ With this solution, you'll control each heating element separately.
 
 ---
 
-You'll have to separate all 3 heating elements, and probably add a new wire for each of them. Sometime, the elements are connected together with a sort of metallic "star". There's one for the (single) phase, and one for the neutral wire. You only need to remove one of them, the one for neutral must stay wired.  
+You'll have to separate all 3 heating elements, and probably add a new wire for each of them. Sometime, the elements are connected together with a sort of metallic "star". There's one for the (single) phase, and one for the neutral wire. You only need to remove one of them, the one for neutral must stay wired.
 
 #### Wiring
 
@@ -177,7 +190,7 @@ In a balanced situation, you don't need any neutral wire. To switch off the devi
 
 For that, I've "recycled" a peak/off peak 3-phase relay but you can use any 3-phase relay. It doesn't matter on which phase the command coil is connected, but it must be permanent (not through the router).
 
-![Heater with mechanical thermostat](img/Heater_mechanical.png)  
+![Heater with mechanical thermostat](img/Heater_mechanical.png)
 *Figure: Wiring diagram*
 
 ## Heater with ACI single phase thermostat
@@ -186,7 +199,7 @@ In this case, it's somehow the same situation as before.
 You don't need to buy a 3-phase kit to convert your single phase heater.
 The ACI pcb must be connected to a permanent phase. It will then control any 3-phase relay.
 
-![Heater with ACI single phase thermostat](img/Heater_ACI_Mono.png)  
+![Heater with ACI single phase thermostat](img/Heater_ACI_Mono.png)
 *Figure: Wiring diagram*
 
 ## Heater with ACI 3-phase thermostat (without neutral wire)
@@ -205,7 +218,7 @@ The remaining connected phase is the one in the middle of the power connector.
 
 The ACI pcb must be connected to 3 permanent phases.
 
-![Heater with ACI 3-phase thermostat](img/Heater_ACI_Tri.png)  
+![Heater with ACI 3-phase thermostat](img/Heater_ACI_Tri.png)
 *Figure: Wiring diagram*
 
 ## Alternatives WITHOUT neutral wire
@@ -230,12 +243,12 @@ In **red**, security switch (see the 'S' on each pole) : all 3 phases are switch
 
 In **green**, only 2 phases are switched off, L2 et L3. ***It is IMPORTANT that the phase L1, not switched by the thermostat, DOES NOT pass through the triac***.
 
-![Mechanical thermostat](img/Thermostat.png)  
+![Mechanical thermostat](img/Thermostat.png)
 *Figure: An example of a thermostat*
 
 ---
 
-![Heater with mechanical thermostat](img/Heater_mechanical-No_neutral.png)  
+![Heater with mechanical thermostat](img/Heater_mechanical-No_neutral.png)
 *Figure: Wiring diagram*
 
 ## Support
@@ -260,6 +273,6 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduc
 
 ## Authors and acknowledgment
 
-- **Fr�d�ric Metrich** - _Initial work_ - [FredM67](https://github.com/FredM67)
+- **Frédéric Metrich** - _Initial work_ - [FredM67](https://github.com/FredM67)
 
 See also the list of [contributors](https://github.com/FredM67/PVRouter-3-phase/graphs/contributors) who participated in this project.

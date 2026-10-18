@@ -48,7 +48,11 @@
 			"utility": "cpp",
 			"vector": "cpp",
 			"xmemory": "cpp",
-			"xutility": "cpp"
+			"xutility": "cpp",
+			"istream": "cpp",
+			"memory": "cpp",
+			"xlocnum": "cpp",
+			"xlocale": "cpp"
 		}
 	}
 }
